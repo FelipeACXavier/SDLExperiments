@@ -1,0 +1,7 @@
+[submodule "CppHelpers"]
+	path = CppHelpers
+	url = https://github.com/FelipeACXavier/CppHelpers.git
+
+[submodule "linalg"]
+	path = linalg
+	url = https://github.com/FelipeACXavier/linalg.git

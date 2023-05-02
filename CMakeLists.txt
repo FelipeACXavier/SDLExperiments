@@ -14,3 +14,4 @@ add_subdirectory(CppHelpers)
 
 # Add each experiment
 add_subdirectory(wave_generation)
+add_subdirectory(boids)

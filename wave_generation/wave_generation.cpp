@@ -10,7 +10,8 @@ static const float FPS = 60.0;
 #define WIDTH 1240
 #define HEIGHT 600
 #define WAVES true
-#define RENDER_ALL true
+#define RENDER_ALL false
+#define DEFINED_WAVE true
 
 int main()
 {
@@ -24,20 +25,28 @@ int main()
   bool run = true;
 
   int scale = 8;
-  int waves = 10;
+  int waves = 50;
   int centerX = WIDTH / 12;
   int centerY = HEIGHT / 2;
 
   double phase = 0;
+  double multi = 1;
+  double mag = (4 / M_PI) * 20;
 
   // Initialize all randomized parameters
   for (int i = 1; i < waves + 1; i++)
   {
+#if DEFINED_WAVE
+    // For specific waves, now set to square wave
+    signals.push_back(linalg::Double2d((mag / multi), phase, linalg::Format::Polar));
+    frequencies.push_back(0.01 * multi * 2);
+    multi += 2;
+#else
+    // For random waves
     signals.push_back(linalg::Double2d(i, phase, linalg::Format::Polar));
-
-    // Start with random phase and frequency
     frequencies.push_back(double(rand() % 200 - 100) / 1000);
     phase += M_PI / (rand() % 10 + 1);
+#endif
 
     colors.push_back({uint8_t(rand() % 255),
                       uint8_t(rand() % 255),
@@ -79,12 +88,12 @@ int main()
       else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP)
       {
         for (auto& f : frequencies)
-          f += 0.01;
+          f *= 0.01;
       }
       else if ((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN))
       {
         for (auto& f : frequencies)
-          f -= 0.01;
+          f /= 0.01;
       }
     }
 

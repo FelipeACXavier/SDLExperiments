@@ -5,11 +5,25 @@
 
 #include "SDL2/SDL.h"
 
-#define WIDTH 1000
-#define HEIGHT 1000
+#define WIDTH 640
+#define HEIGHT 480
 #define FPS 60
-#define SIZE 10
-#define BOIDS 50
+#define SIZE 5
+#define BOIDS 100
+
+double ToroidalDistance (linalg::Double2d p1, linalg::Double2d p2, int width, int height)
+{
+  float dx = std::abs(p2.X() - p1.X());
+  float dy = std::abs(p2.Y() - p1.Y());
+
+  if (dx > width / 2)
+      dx = width - dx;
+
+  if (dy > height / 2)
+      dy = height - dy;
+
+  return std::sqrt(dx * dx + dy * dy);
+}
 
 class Boid
 {
@@ -21,8 +35,6 @@ public:
     mPos = linalg::Double2d(rand() % WIDTH, rand() % HEIGHT);
 
     double angle = double(rand() % 314) / 100;
-    LOG_INFO("Boid: %u starting at %s with velocity: %.2lf %.2lf", mId, mPos.ToString().c_str(), 1.0f, angle);
-
     mVel = linalg::Double2d(rand() % (int)mMaxSpeed + 1, angle, linalg::Format::Polar);
   }
 
@@ -109,7 +121,7 @@ public:
     return avg;
   }
 
-  linalg::Double2d Cohesion(SDL_Renderer* renderer, const std::vector<Boid>& boids) const
+  linalg::Double2d Cohesion(const std::vector<Boid>& boids) const
   {
     int counted = 0;
     double radius = 100;
@@ -139,7 +151,7 @@ public:
     return avg;
   }
 
-  linalg::Double2d Combined(SDL_Renderer* renderer, const std::vector<Boid>& boids) const
+  linalg::Double2d Combined(const std::vector<Boid>& boids) const
   {
     int counted = 0;
     linalg::Double2d avgAlignment, avgSeparation, avgCohesion;
@@ -149,7 +161,7 @@ public:
       if (b.Id() == Id())
         continue;
 
-      auto distance = mPos.Distance(b.Position());
+      auto distance = ToroidalDistance(mPos, b.Position(), WIDTH, HEIGHT);  // mPos.Distance(b.Position());
       if (distance >= mRadius || distance < 0.01)
         continue;
 
@@ -204,13 +216,9 @@ public:
       p[1] = 0;
   }
 
-  void Update(SDL_Renderer* renderer, const std::vector<Boid>& boids)
+  void Update(const std::vector<Boid>& boids)
   {
-    // mAcc += Alignment(boids);
-    // mAcc += Separation(boids);
-    // mAcc += Cohesion(renderer, boids);
-
-    linalg::Double2d acceleration = Combined(renderer, boids);
+    linalg::Double2d acceleration = Combined(boids);
 
     linalg::Double2d p = mPos + mVel;
 
@@ -289,12 +297,12 @@ public:
     mBoids.push_back(Boid(mBoids.size()));
   }
 
-  void Update(SDL_Renderer* renderer, double a, double s, double c)
+  void Update(double a, double s, double c)
   {
     for (auto& boid : mBoids)
     {
       boid.UpdateMultipliers(a, s, c);
-      boid.Update(renderer, mBoids);
+      boid.Update(mBoids);
     }
   }
 
@@ -308,6 +316,8 @@ private:
   std::vector<Boid> mBoids;
 };
 
+// TODO: Move to SDL plugin library
+// TODO: Add slider title and improve mouse detection
 class Slider
 {
 public:
@@ -415,12 +425,12 @@ int main()
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    auto a = sAlignment.Update(renderer, event);
-    auto s = sSeparation.Update(renderer, event);
-    auto c = sCohesion.Update(renderer, event);
+    auto a = 2 * sAlignment.Update(renderer, event);
+    auto s = 2 * sSeparation.Update(renderer, event);
+    auto c = 2 * sCohesion.Update(renderer, event);
 
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 200);
-    boids.Update(renderer, a, s, c);
+    boids.Update(a, s, c);
     boids.Draw(renderer);
 
     SDL_RenderPresent(renderer);

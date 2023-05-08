@@ -4,12 +4,15 @@
 #include <random>
 
 #include "SDL2/SDL.h"
+#include <SDL_ttf.h>
 
 #define WIDTH 640
 #define HEIGHT 480
 #define FPS 60
 #define SIZE 5
 #define BOIDS 100
+
+TTF_Font* font;
 
 double ToroidalDistance (linalg::Double2d p1, linalg::Double2d p2, int width, int height)
 {
@@ -317,16 +320,31 @@ private:
 };
 
 // TODO: Move to SDL plugin library
-// TODO: Add slider title and improve mouse detection
+void PrintText(SDL_Renderer* renderer, SDL_Rect dest, const std::string& text)
+{
+  SDL_Surface* text_surf = TTF_RenderText_Solid(font, text.c_str(), {255, 255, 255});
+  SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, text_surf);
+
+  dest.x = dest.x + (text_surf->w / 2.0f);
+  dest.y = dest.y - (text_surf->h);
+  dest.w = text_surf->w;
+  dest.h = text_surf->h;
+
+  SDL_RenderCopy(renderer, texture, NULL, &dest);
+
+  SDL_DestroyTexture(texture);
+  SDL_FreeSurface(text_surf);
+}
+
 class Slider
 {
 public:
-  Slider(int x, int y, int w, int h, SDL_Color color)
-      : mPressed(false)
-      , mMaxValue(h)
+  Slider(int x, int y, int w, int h, SDL_Color color, const std::string& text)
+      : mMaxValue(h)
       , mRect{x, y, w, h}
       , mColor(color)
       , mCurrentValue(0)
+      , mText(text)
   {
   }
 
@@ -337,11 +355,6 @@ public:
 
   double Update(SDL_Renderer* renderer, const SDL_Event& event)
   {
-    if (event.type == SDL_MOUSEBUTTONDOWN)
-      mPressed = true;
-    else if (event.type == SDL_MOUSEBUTTONUP)
-      mPressed = false;
-
     // Render borders
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(renderer, &mRect);
@@ -350,6 +363,7 @@ public:
 
     SDL_Rect rect = {mRect.x, Top() + mCurrentValue, mRect.w, mRect.h - mCurrentValue};
 
+    PrintText(renderer, {mRect.x, Top(), 0, 0}, mText);
     SDL_SetRenderDrawColor(renderer, mColor.r, mColor.g, mColor.b, 200);
     SDL_RenderFillRect(renderer, &rect);
 
@@ -358,11 +372,9 @@ public:
 
   int GetNewValue()
   {
-    if (!mPressed)
-      return mCurrentValue;
-
     int x, y;
-    SDL_GetMouseState(&x, &y);
+    if (!(SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK))
+      return mCurrentValue;
 
     if ((x > mRect.x && x < mRect.x + mRect.w) && (y > mRect.y - 5 && y < mRect.y + mRect.h + 5))
       return std::min(mMaxValue, std::max(0, y - Top()));
@@ -374,8 +386,8 @@ private:
   const SDL_Rect mRect;
   const SDL_Color mColor;
   const int mMaxValue;
+  const std::string mText;
 
-  bool mPressed;
   int mCurrentValue;
 };
 
@@ -384,15 +396,23 @@ int main()
   srand(time(NULL));
 
   SDL_Init(SDL_INIT_VIDEO);
+  TTF_Init();
+
+#ifdef FONT_FILE
+  font = TTF_OpenFont(FONT_FILE, 18);
+#else
+  LOG_ERROR("Failed to load font");
+  return -1;
+#endif
 
   Boids boids;
 
   bool run = true;
   bool pressed = false;
 
-  Slider sAlignment(WIDTH - 80, HEIGHT - 210, 20, 200, {0, 255, 0});
-  Slider sSeparation(WIDTH - 55, HEIGHT - 210, 20, 200, {255, 0, 0});
-  Slider sCohesion(WIDTH - 30, HEIGHT - 210, 20, 200, {0, 0, 255});
+  Slider sAlignment(WIDTH - 80, HEIGHT - 210, 20, 200, {0, 255, 0}, "A");
+  Slider sSeparation(WIDTH - 55, HEIGHT - 210, 20, 200, {255, 0, 0}, "S");
+  Slider sCohesion(WIDTH - 30, HEIGHT - 210, 20, 200, {0, 0, 255}, "C");
 
   SDL_DisplayMode DM0, DM1;
   SDL_GetCurrentDisplayMode(0, &DM0);
@@ -425,18 +445,20 @@ int main()
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 200);
+    boids.Draw(renderer);
+
     auto a = 2 * sAlignment.Update(renderer, event);
     auto s = 2 * sSeparation.Update(renderer, event);
     auto c = 2 * sCohesion.Update(renderer, event);
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 200);
     boids.Update(a, s, c);
-    boids.Draw(renderer);
 
     SDL_RenderPresent(renderer);
     SDL_Delay(1000 / FPS);
   }
 
+  TTF_Quit();
   SDL_Quit();
   return 0;
 }
